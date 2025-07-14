@@ -22,6 +22,11 @@ public class UserController {
         return userService.findAll();
     }
 
+    @GetMapping("/{userId}")
+    public User find(@PathVariable long userId) {
+        return userService.find(userId);
+    }
+
     @PostMapping
     public User create(@RequestBody User user) {
         return userService.create(user);

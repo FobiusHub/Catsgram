@@ -17,6 +17,14 @@ public class UserService {
         return users.values();
     }
 
+    public User find(long id) {
+        if (users.containsKey(id)) {
+            return users.get(id);
+        } else {
+            throw new NotFoundException("Пользователь с id " + id + " не существует");
+        }
+    }
+
     public User create(User user) {
         // проверяем выполнение необходимых условий
         if (user.getEmail() == null || user.getEmail().isBlank()) {
