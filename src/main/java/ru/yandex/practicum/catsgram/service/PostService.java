@@ -19,7 +19,7 @@ public class PostService {
     private final UserService userService;
 
     public Collection<Post> findAll(long size, long from, String sort) {
-        if (size < 0) {
+        if (size <= 0) {
             throw new ConditionsNotMetException("Размер должен быть больше нуля");
         }
         Collection<Post> postsList;
