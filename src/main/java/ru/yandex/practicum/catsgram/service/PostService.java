@@ -41,9 +41,9 @@ public class PostService {
         return postsList;
     }
 
-    public Post find(long id) {
+    public Optional<Post> find(long id) {
         if (posts.containsKey(id)) {
-            return posts.get(id);
+            return Optional.of(posts.get(id));
         } else {
             throw new NotFoundException("Пост с id " + id + " не существует");
         }
