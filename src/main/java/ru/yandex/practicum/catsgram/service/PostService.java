@@ -19,9 +19,6 @@ public class PostService {
     private final UserService userService;
 
     public Collection<Post> findAll(long size, long from, String sort) {
-        if (size < 0) {
-            throw new ConditionsNotMetException("Размер должен быть больше нуля");
-        }
         Collection<Post> postsList;
         if (sort.equals("asc")) {
             postsList = posts.values().stream()
@@ -29,21 +26,19 @@ public class PostService {
                     .skip(from)
                     .limit(size)
                     .toList();
-        } else if (sort.equals("desc")) {
+        } else {
             postsList = posts.values().stream()
                     .sorted(Comparator.comparing(Post::getPostDate).reversed())
                     .skip(from)
                     .limit(size)
                     .toList();
-        } else {
-            throw new ConditionsNotMetException("Неверный параметр сортировки");
         }
         return postsList;
     }
 
-    public Post find(long id) {
+    public Optional<Post> find(long id) {
         if (posts.containsKey(id)) {
-            return posts.get(id);
+            return Optional.of(posts.get(id));
         } else {
             throw new NotFoundException("Пост с id " + id + " не существует");
         }
