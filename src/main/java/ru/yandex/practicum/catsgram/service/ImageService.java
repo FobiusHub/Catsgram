@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import ru.yandex.practicum.catsgram.exception.ConditionsNotMetException;
+import ru.yandex.practicum.catsgram.dal.ImageRepository;
 import ru.yandex.practicum.catsgram.exception.ImageFileException;
 import ru.yandex.practicum.catsgram.exception.NotFoundException;
 import ru.yandex.practicum.catsgram.model.Image;
@@ -16,9 +16,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,14 +25,29 @@ import java.util.stream.Collectors;
 public class ImageService {
     private final PostService postService;
     private final String imageDirectory = "C:\\CatsgramImages";
-    private final Map<Long, Image> images = new HashMap<>();
+    private final ImageRepository imageRepository;
 
     // получение данных об изображениях указанного поста
     public List<Image> getPostImages(long postId) {
-        return images.values()
-                .stream()
-                .filter(image -> image.getPostId() == postId)
-                .collect(Collectors.toList());
+        return imageRepository.findByPostId(postId);
+    }
+
+    // сохранение списка изображений, связанных с указанным постом
+    public List<Image> saveImages(long postId, List<MultipartFile> files) {
+        return files.stream().map(file -> saveImage(postId, file)).collect(Collectors.toList());
+    }
+
+    // загружаем данные указанного изображения с диска
+    public ImageData getImageData(long imageId) {
+        Optional<Image> optionalImage = imageRepository.findById(imageId);
+        if (optionalImage.isEmpty()) {
+            throw new NotFoundException("Изображение с id = " + imageId + " не найдено");
+        }
+        Image image = optionalImage.get();
+        // загрузка файла с диска
+        byte[] data = loadFile(image);
+
+        return new ImageData(data, image.getOriginalFileName());
     }
 
     // сохранение файла изображения
@@ -60,54 +74,24 @@ public class ImageService {
         }
     }
 
-    // сохранение списка изображений, связанных с указанным постом
-    public List<Image> saveImages(long postId, List<MultipartFile> files) {
-        return files.stream().map(file -> saveImage(postId, file)).collect(Collectors.toList());
-    }
-
     // сохранение отдельного изображения, связанного с указанным постом
     private Image saveImage(long postId, MultipartFile file) {
-        Post post = postService.find(postId)
-                .orElseThrow(() -> new ConditionsNotMetException("Указанный пост не найден"));
+        //Если пост не найден - исключение возникнет в PostService, поэтому доп проверка не требуется
+        Post post = postService.getPostById(postId);
 
         // сохраняем изображение на диск и возвращаем путь к файлу
         Path filePath = saveFile(file, post);
 
-        // создаём объект для хранения данных изображения
-        long imageId = getNextId();
-
         // создание объекта изображения и заполнение его данными
         Image image = new Image();
-        image.setId(imageId);
         image.setFilePath(filePath.toString());
         image.setPostId(postId);
         // запоминаем название файла, которое было при его передаче
         image.setOriginalFileName(file.getOriginalFilename());
 
-        images.put(imageId, image);
+        image = imageRepository.save(image);
 
         return image;
-    }
-
-    private long getNextId() {
-        long currentMaxId = images.keySet()
-                .stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
-        return ++currentMaxId;
-    }
-
-    // загружаем данные указанного изображения с диска
-    public ImageData getImageData(long imageId) {
-        if (!images.containsKey(imageId)) {
-            throw new NotFoundException("Изображение с id = " + imageId + " не найдено");
-        }
-        Image image = images.get(imageId);
-        // загрузка файла с диска
-        byte[] data = loadFile(image);
-
-        return new ImageData(data, image.getOriginalFileName());
     }
 
     private byte[] loadFile(Image image) {
@@ -124,5 +108,4 @@ public class ImageService {
                     + ", name: " + image.getOriginalFileName());
         }
     }
-
 }

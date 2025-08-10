@@ -2,32 +2,49 @@ package ru.yandex.practicum.catsgram.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.catsgram.exception.ConditionsNotMetException;
+import ru.yandex.practicum.catsgram.dal.PostRepository;
+import ru.yandex.practicum.catsgram.dto.NewPostRequest;
+import ru.yandex.practicum.catsgram.dto.UpdatePostRequest;
+import ru.yandex.practicum.catsgram.dto.UserDto;
 import ru.yandex.practicum.catsgram.exception.NotFoundException;
+import ru.yandex.practicum.catsgram.mapper.PostMapper;
 import ru.yandex.practicum.catsgram.model.Post;
-import ru.yandex.practicum.catsgram.model.User;
 
-import java.time.Instant;
 import java.util.*;
 
-// Указываем, что класс PostService - является бином и его
-// нужно добавить в контекст приложения
 @Service
 @RequiredArgsConstructor
 public class PostService {
-    private final Map<Long, Post> posts = new HashMap<>();
+    private final PostRepository postRepository;
     private final UserService userService;
 
-    public Collection<Post> findAll(long size, long from, String sort) {
+    public Post createPost(NewPostRequest request) {
+        long authorId = request.getAuthorId();
+        //Запрашиваем пользователя по-указанному id. Если пользователь не существует userService выбросит исключение.
+        UserDto userOptional = userService.getUserById(authorId);
+
+        Post post = PostMapper.mapToPost(request);
+
+        post = postRepository.save(post);
+
+        return post;
+    }
+
+    public Post getPostById(long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Пост с id " + postId + " не существует"));
+    }
+
+    public Collection<Post> getPosts(long size, long from, String sort) {
         Collection<Post> postsList;
         if (sort.equals("asc")) {
-            postsList = posts.values().stream()
+            postsList = postRepository.findAll().stream()
                     .sorted(Comparator.comparing(Post::getPostDate))
                     .skip(from)
                     .limit(size)
                     .toList();
         } else {
-            postsList = posts.values().stream()
+            postsList = postRepository.findAll().stream()
                     .sorted(Comparator.comparing(Post::getPostDate).reversed())
                     .skip(from)
                     .limit(size)
@@ -36,51 +53,11 @@ public class PostService {
         return postsList;
     }
 
-    public Optional<Post> find(long id) {
-        if (posts.containsKey(id)) {
-            return Optional.of(posts.get(id));
-        } else {
-            throw new NotFoundException("Пост с id " + id + " не существует");
-        }
-    }
-
-    public Post create(Post post) {
-        long authorId = post.getAuthorId();
-        Optional<User> userOptional = userService.findUserById(authorId);
-        if (userOptional.isEmpty()) {
-            throw new ConditionsNotMetException("«Автор с id = " + authorId + " не найден»");
-        }
-        if (post.getDescription() == null || post.getDescription().isBlank()) {
-            throw new ConditionsNotMetException("Описание не может быть пустым");
-        }
-
-        post.setId(getNextId());
-        post.setPostDate(Instant.now());
-        posts.put(post.getId(), post);
-        return post;
-    }
-
-    public Post update(Post newPost) {
-        if (newPost.getId() == null) {
-            throw new ConditionsNotMetException("Id должен быть указан");
-        }
-        if (posts.containsKey(newPost.getId())) {
-            Post oldPost = posts.get(newPost.getId());
-            if (newPost.getDescription() == null || newPost.getDescription().isBlank()) {
-                throw new ConditionsNotMetException("Описание не может быть пустым");
-            }
-            oldPost.setDescription(newPost.getDescription());
-            return oldPost;
-        }
-        throw new NotFoundException("Пост с id = " + newPost.getId() + " не найден");
-    }
-
-    private long getNextId() {
-        long currentMaxId = posts.keySet()
-                .stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
-        return ++currentMaxId;
+    public Post updatePost(long postId, UpdatePostRequest request) {
+        Post updatedPost = postRepository.findById(postId)
+                .map(post -> PostMapper.updatePostFields(post, request))
+                .orElseThrow(() -> new NotFoundException("Пост не найден"));
+        updatedPost = postRepository.update(updatedPost);
+        return updatedPost;
     }
 }

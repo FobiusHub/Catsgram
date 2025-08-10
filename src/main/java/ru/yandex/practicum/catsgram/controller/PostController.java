@@ -1,8 +1,10 @@
 package ru.yandex.practicum.catsgram.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import ru.yandex.practicum.catsgram.dto.NewPostRequest;
+import ru.yandex.practicum.catsgram.dto.UpdatePostRequest;
 import ru.yandex.practicum.catsgram.exception.ParameterNotValidException;
 import ru.yandex.practicum.catsgram.model.Post;
 import ru.yandex.practicum.catsgram.service.PostService;
@@ -10,17 +12,25 @@ import ru.yandex.practicum.catsgram.service.PostService;
 import java.util.Collection;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/posts")
 public class PostController {
     private final PostService postService;
 
-    @Autowired
-    public PostController(PostService postService) {
-        this.postService = postService;
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Post createPost(@RequestBody NewPostRequest request) {
+        return postService.createPost(request);
+    }
+
+    @PutMapping("/{postId}")
+    public Post updatePost(@PathVariable("postId") long postId, @RequestBody UpdatePostRequest request) {
+        return postService.updatePost(postId, request);
     }
 
     @GetMapping
-    public Collection<Post> findAll(@RequestParam(defaultValue = "10") long size,
+    @ResponseStatus(HttpStatus.OK)
+    public Collection<Post> getPosts(@RequestParam(defaultValue = "10") long size,
                                     @RequestParam(defaultValue = "0") long from,
                                     @RequestParam(defaultValue = "desc") String sort) {
         if (sort == null || (!sort.equals("asc") && !sort.equals("desc"))) {
@@ -33,22 +43,16 @@ public class PostController {
             throw new ParameterNotValidException(from + "", "Параметр from должен быть не меньше нуля");
         }
 
-        return postService.findAll(size, from, sort);
+        return postService.getPosts(size, from, sort);
     }
 
     @GetMapping("/{postId}")
-    public Post find(@PathVariable long postId) {
-        return postService.find(postId).get();
+    @ResponseStatus(HttpStatus.OK)
+    public Post find(@PathVariable("postId") long postId) {
+        return postService.getPostById(postId);
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Post create(@RequestBody Post post) {
-        return postService.create(post);
-    }
 
-    @PutMapping
-    public Post update(@RequestBody Post newPost) {
-        return postService.update(newPost);
-    }
+
+
 }
